@@ -332,7 +332,7 @@ def shift_to_cells(shift_code: str) -> list:
     elif shift_code == "4":
         cells[6] = "Вихідний 1"
 
-    elif shift_code == "5":
+    elif shift_code == "5":3
         cells[6] = "Вихідний 2"
 
     elif shift_code == "6":
