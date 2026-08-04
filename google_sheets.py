@@ -3,7 +3,6 @@ import json
 import re
 import threading
 import time
-from pathlib import Path
 from typing import Dict, List, Tuple
 
 import gspread
@@ -44,8 +43,10 @@ _client = None
 _spreadsheet = None
 _worksheet = None
 _managers_worksheet = None
+
 _connection_lock = threading.RLock()
 _sheet_lock = threading.RLock()
+
 _availability_cache: Dict[str, Tuple[float, dict]] = {}
 _manager_row_cache: Dict[Tuple[str, str], int] = {}
 
@@ -57,15 +58,29 @@ def get_worksheet():
         if _worksheet is not None:
             return _worksheet
 
-        credentials_info = json.loads(os.environ["GOOGLE_CREDENTIALS_JSON"])
+        credentials_json = os.environ.get("GOOGLE_CREDENTIALS_JSON")
 
-credentials = Credentials.from_service_account_info(
-    credentials_info,
-    scopes=SCOPES,
-)
+        if not credentials_json:
+            raise ValueError(
+                "У Railway не знайдено змінну GOOGLE_CREDENTIALS_JSON"
+            )
+
+        try:
+            credentials_info = json.loads(credentials_json)
+        except json.JSONDecodeError as error:
+            raise ValueError(
+                "Змінна GOOGLE_CREDENTIALS_JSON містить неправильний JSON"
+            ) from error
+
+        credentials = Credentials.from_service_account_info(
+            credentials_info,
+            scopes=SCOPES,
+        )
+
         _client = gspread.authorize(credentials)
         _spreadsheet = _client.open_by_key(SPREADSHEET_ID)
         _worksheet = _spreadsheet.worksheet(SHEET_NAME)
+
         return _worksheet
 
 
@@ -86,6 +101,7 @@ def clear_runtime_cache():
 
 def check_connection() -> dict:
     worksheet = get_worksheet()
+
     return {
         "sheet_name": worksheet.title,
         "manager_d9": worksheet.acell("D9").value,
@@ -108,7 +124,11 @@ def _read_availability_cells(day_code: str) -> dict:
 
     with _sheet_lock:
         values = worksheet.batch_get(
-            [cells["first"], cells["second"], cells["days_off"]]
+            [
+                cells["first"],
+                cells["second"],
+                cells["days_off"],
+            ]
         )
 
     def extract(index: int):
@@ -124,7 +144,10 @@ def _read_availability_cells(day_code: str) -> dict:
     }
 
 
-def get_day_free_places(day_code: str, force_refresh: bool = False) -> dict:
+def get_day_free_places(
+    day_code: str,
+    force_refresh: bool = False,
+) -> dict:
     if day_code not in AVAILABILITY_CELLS:
         raise ValueError(f"Невідомий день: {day_code}")
 
@@ -137,14 +160,20 @@ def get_day_free_places(day_code: str, force_refresh: bool = False) -> dict:
         and now - cached[0] < AVAILABILITY_CACHE_TTL
     ):
         return dict(cached[1])
-
-    free_places = _read_availability_cells(day_code)
+        free_places = _read_availability_cells(day_code)
     _availability_cache[day_code] = (now, free_places)
+
     return dict(free_places)
 
 
-def get_shift_availability(day_code: str, force_refresh: bool = False) -> dict:
-    free_places = get_day_free_places(day_code, force_refresh)
+def get_shift_availability(
+    day_code: str,
+    force_refresh: bool = False,
+) -> dict:
+    free_places = get_day_free_places(
+        day_code,
+        force_refresh,
+    )
 
     first_available = free_places["first"] > 0
     second_available = free_places["second"] > 0
@@ -166,33 +195,49 @@ def get_shift_availability(day_code: str, force_refresh: bool = False) -> dict:
     }
 
 
-
-
 def get_shift_group(shift_code: str) -> str:
     if shift_code in ("1", "1.1", "3", "6", "6.1"):
         return "first"
+
     if shift_code == "2":
         return "second"
+
     if shift_code in ("4", "5"):
         return "days_off"
+
     raise ValueError(f"Невідомий код зміни: {shift_code}")
 
 
-def is_shift_available(day_code: str, shift_code: str, force_refresh: bool = True) -> bool:
-    availability = get_shift_availability(day_code, force_refresh=force_refresh)
+def is_shift_available(
+    day_code: str,
+    shift_code: str,
+    force_refresh: bool = True,
+) -> bool:
+    availability = get_shift_availability(
+        day_code,
+        force_refresh=force_refresh,
+    )
+
     return bool(availability.get(shift_code, False))
+
 
 def normalize_text(value: str) -> str:
     value = str(value or "").lower()
     value = value.replace("’", "'").replace("`", "'")
     value = re.sub(r"[^а-яіїєґa-z0-9' ]", " ", value)
     value = re.sub(r"\s+", " ", value)
+
     return value.strip()
 
 
 def get_manager_search_words(manager_name: str) -> list:
     normalized_name = normalize_text(manager_name)
-    ignored_words = {"менеджер", "manager", "зам", "сам"}
+    ignored_words = {
+        "менеджер",
+        "manager",
+        "зам",
+        "сам",
+    }
 
     words = [
         word
@@ -208,11 +253,19 @@ def get_manager_search_words(manager_name: str) -> list:
     return words
 
 
-def find_manager_row_for_day(worksheet, manager_name: str, day_code: str) -> int:
+def find_manager_row_for_day(
+    worksheet,
+    manager_name: str,
+    day_code: str,
+) -> int:
     if day_code not in DAY_START_ROWS:
         raise ValueError(f"Невідомий день: {day_code}")
 
-    cache_key = (normalize_text(manager_name), day_code)
+    cache_key = (
+        normalize_text(manager_name),
+        day_code,
+    )
+
     if cache_key in _manager_row_cache:
         return _manager_row_cache[cache_key]
 
@@ -221,7 +274,9 @@ def find_manager_row_for_day(worksheet, manager_name: str, day_code: str) -> int
     end_row = start_row + DAY_BLOCK_SIZE - 1
 
     with _sheet_lock:
-        manager_cells = worksheet.get(f"D{start_row}:D{end_row}")
+        manager_cells = worksheet.get(
+            f"D{start_row}:D{end_row}"
+        )
 
     matches = []
 
@@ -232,14 +287,16 @@ def find_manager_row_for_day(worksheet, manager_name: str, day_code: str) -> int
         normalized_cell = normalize_text(row_values[0])
 
         if normalized_cell and all(
-            word in normalized_cell for word in manager_words
+            word in normalized_cell
+            for word in manager_words
         ):
             matches.append(start_row + index)
 
     if not matches:
         raise ValueError(
             f"Менеджера «{manager_name}» не знайдено "
-            f"у блоці дня {day_code}, рядки {start_row}–{end_row}."
+            f"у блоці дня {day_code}, "
+            f"рядки {start_row}–{end_row}."
         )
 
     if len(matches) > 1:
@@ -249,38 +306,49 @@ def find_manager_row_for_day(worksheet, manager_name: str, day_code: str) -> int
         )
 
     _manager_row_cache[cache_key] = matches[0]
+
     return matches[0]
 
 
-def shift_to_cells(shift_code):
+def shift_to_cells(shift_code: str) -> list:
     cells = [""] * 14
 
     if shift_code == "1.1":
         for hour in range(8, 17):
             cells[hour - 8] = "1"
+
     elif shift_code == "1":
         for hour in range(9, 18):
             cells[hour - 8] = "1"
+
     elif shift_code == "2":
         for hour in range(13, 22):
             cells[hour - 8] = "1"
+
     elif shift_code == "3":
         for hour in range(10, 19):
             cells[hour - 8] = "1"
+
     elif shift_code == "4":
         cells[6] = "Вихідний 1"
-    elif shift_code == "5":
+        elif shift_code == "5":
         cells[6] = "Вихідний 2"
+
     elif shift_code == "6":
         for hour in range(9, 14):
             cells[hour - 8] = "1"
+
     elif shift_code == "6.1":
         for hour in range(9, 14):
             cells[hour - 8] = "1"
+
         for hour in range(17, 22):
             cells[hour - 8] = "1"
+
     else:
-        raise ValueError(f"Невідомий код зміни: {shift_code}")
+        raise ValueError(
+            f"Невідомий код зміни: {shift_code}"
+        )
 
     return cells
 
@@ -291,6 +359,7 @@ def save_one_day_for_manager(
     shift_code: str,
 ) -> int:
     worksheet = get_worksheet()
+
     manager_row = find_manager_row_for_day(
         worksheet,
         manager_name,
@@ -305,17 +374,23 @@ def save_one_day_for_manager(
         )
 
     _availability_cache.pop(day_code, None)
+
     return manager_row
 
 
-def save_schedule_for_manager(manager_name: str, schedule: dict) -> dict:
+def save_schedule_for_manager(
+    manager_name: str,
+    schedule: dict,
+) -> dict:
     worksheet = get_worksheet()
     updates: List[dict] = []
     updated_rows = {}
 
     for day_code in DAY_ORDER:
         if day_code not in schedule:
-            raise ValueError(f"Не вибрано зміну для дня: {day_code}")
+            raise ValueError(
+                f"Не вибрано зміну для дня: {day_code}"
+            )
 
         manager_row = find_manager_row_for_day(
             worksheet,
@@ -326,9 +401,12 @@ def save_schedule_for_manager(manager_name: str, schedule: dict) -> dict:
         updates.append(
             {
                 "range": f"E{manager_row}:R{manager_row}",
-                "values": [shift_to_cells(schedule[day_code])],
+                "values": [
+                    shift_to_cells(schedule[day_code])
+                ],
             }
         )
+
         updated_rows[day_code] = manager_row
 
     with _sheet_lock:
@@ -345,33 +423,62 @@ def save_schedule_for_manager(manager_name: str, schedule: dict) -> dict:
 
 # =========================
 # ВКЛАДКА «МЕНЕДЖЕРИ»
-# A — Менеджер, B — Telegram ID, C — Пріоритет, D — Активний
+# A — Менеджер
+# B — Telegram ID
+# C — Пріоритет
+# D — Активний
+# E — Ранній доступ
 # =========================
 
 def get_managers_worksheet():
-    global _client, _spreadsheet, _managers_worksheet
+    global _client
+    global _managers_worksheet
 
     with _connection_lock:
         if _managers_worksheet is not None:
             return _managers_worksheet
 
-        # Спочатку відкриваємо основну таблицю, щоб ініціалізувати підключення.
         get_worksheet()
-        _managers_spreadsheet = _client.open_by_key("12G8hE-Y4vQXbpPWYQcmNI70jJeikDvmMWFGM2bUvtik")
-        _managers_worksheet = _managers_spreadsheet.get_worksheet(0)
+
+        managers_spreadsheet = _client.open_by_key(
+            "12G8hE-Y4vQXbpPWYQcmNI70jJeikDvmMWFGM2bUvtik"
+        )
+
+        try:
+            _managers_worksheet = (
+                managers_spreadsheet.worksheet(
+                    MANAGERS_SHEET_NAME
+                )
+            )
+        except gspread.WorksheetNotFound:
+            _managers_worksheet = (
+                managers_spreadsheet.get_worksheet(0)
+            )
+
         return _managers_worksheet
 
 
 def checkbox_to_bool(value) -> bool:
     normalized = str(value or "").strip().lower()
-    return normalized in {"true", "1", "так", "yes", "y", "on", "✓", "✅"}
+
+    return normalized in {
+        "true",
+        "1",
+        "так",
+        "yes",
+        "y",
+        "on",
+        "✓",
+        "✅",
+    }
 
 
 def normalize_telegram_id(value) -> str:
     text = str(value or "").strip()
-    # Google Sheets іноді повертає число як 7918173155.0
+
     if text.endswith(".0") and text[:-2].isdigit():
         text = text[:-2]
+
     return text
 
 
@@ -383,10 +490,19 @@ def _read_managers_rows() -> list:
 
     rows = []
 
-    for sheet_row, row in enumerate(values, start=2):
+    for sheet_row, row in enumerate(
+        values,
+        start=2,
+    ):
         padded = list(row) + [""] * (5 - len(row))
 
-        manager_name, telegram_id, priority, active, early_access = padded[:5]
+        (
+            manager_name,
+            telegram_id,
+            priority,
+            active,
+            early_access,
+        ) = padded[:5]
 
         if not str(manager_name or "").strip():
             continue
@@ -394,47 +510,70 @@ def _read_managers_rows() -> list:
         rows.append(
             {
                 "row": sheet_row,
-                "manager_name": str(manager_name or "").strip(),
-                "telegram_id": normalize_telegram_id(telegram_id),
+                "manager_name": str(
+        manager_name or ""
+                ).strip(),
+                "telegram_id": normalize_telegram_id(
+                    telegram_id
+                ),
                 "priority": checkbox_to_bool(priority),
                 "active": checkbox_to_bool(active),
-                "early_access": checkbox_to_bool(early_access),
+                "early_access": checkbox_to_bool(
+                    early_access
+                ),
             }
         )
 
     return rows
 
 
-def get_manager_access_record(telegram_id: int | str, manager_name: str = "") -> dict | None:
-    telegram_id_text = normalize_telegram_id(telegram_id)
+def get_manager_access_record(
+    telegram_id: int | str,
+    manager_name: str = "",
+) -> dict | None:
+    telegram_id_text = normalize_telegram_id(
+        telegram_id
+    )
+
     rows = _read_managers_rows()
 
-    # Найнадійніший пошук — за Telegram ID.
     for row in rows:
         if row["telegram_id"] == telegram_id_text:
             return row
 
-    # Якщо ID ще не внесено, пробуємо знайти менеджера за Telegram-ім'ям.
     if manager_name:
-        search_words = get_manager_search_words(manager_name)
+        search_words = get_manager_search_words(
+            manager_name
+        )
+
         matches = []
+
         for row in rows:
-            normalized_cell = normalize_text(row["manager_name"])
-            if normalized_cell and all(word in normalized_cell for word in search_words):
+            normalized_cell = normalize_text(
+                row["manager_name"]
+            )
+
+            if normalized_cell and all(
+                word in normalized_cell
+                for word in search_words
+            ):
                 matches.append(row)
 
         if len(matches) == 1:
             match = matches[0]
-            # Автоматично записуємо Telegram ID у колонку B, якщо вона порожня.
+
             if not match["telegram_id"]:
                 worksheet = get_managers_worksheet()
+
                 with _sheet_lock:
                     worksheet.update(
                         range_name=f"B{match['row']}",
                         values=[[telegram_id_text]],
                         value_input_option="USER_ENTERED",
                     )
+
                 match["telegram_id"] = telegram_id_text
+
             return match
 
     return None
