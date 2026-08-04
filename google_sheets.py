@@ -1,3 +1,5 @@
+import os
+import json
 import re
 import threading
 import time
@@ -11,7 +13,6 @@ from google.oauth2.service_account import Credentials
 SPREADSHEET_ID = "1HSahM1YzFh6J2xJ1AZAR-apsmJ41_hO2xzUR_W-BMug"
 SHEET_NAME = "Прихована копія"
 MANAGERS_SHEET_NAME = "Менеджери"
-CREDENTIALS_FILE = str(Path(__file__).with_name("credentials.json"))
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 AVAILABILITY_CACHE_TTL = 5
@@ -56,10 +57,12 @@ def get_worksheet():
         if _worksheet is not None:
             return _worksheet
 
-        credentials = Credentials.from_service_account_file(
-            CREDENTIALS_FILE,
-            scopes=SCOPES,
-        )
+        credentials_info = json.loads(os.environ["GOOGLE_CREDENTIALS_JSON"])
+
+credentials = Credentials.from_service_account_info(
+    credentials_info,
+    scopes=SCOPES,
+)
         _client = gspread.authorize(credentials)
         _spreadsheet = _client.open_by_key(SPREADSHEET_ID)
         _worksheet = _spreadsheet.worksheet(SHEET_NAME)
