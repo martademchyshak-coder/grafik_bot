@@ -63,7 +63,7 @@ def get_worksheet():
         if not credentials_json:
             raise ValueError(
                 "У Railway не знайдено змінну GOOGLE_CREDENTIALS_JSON"
-            )
+        )
 
         try:
             credentials_info = json.loads(credentials_json)
