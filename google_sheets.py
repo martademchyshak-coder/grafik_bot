@@ -160,7 +160,8 @@ def get_day_free_places(
         and now - cached[0] < AVAILABILITY_CACHE_TTL
     ):
         return dict(cached[1])
-        free_places = _read_availability_cells(day_code)
+
+    free_places = _read_availability_cells(day_code)
     _availability_cache[day_code] = (now, free_places)
 
     return dict(free_places)
