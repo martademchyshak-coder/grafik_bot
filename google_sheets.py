@@ -331,7 +331,8 @@ def shift_to_cells(shift_code: str) -> list:
 
     elif shift_code == "4":
         cells[6] = "Вихідний 1"
-        elif shift_code == "5":
+
+    elif shift_code == "5":
         cells[6] = "Вихідний 2"
 
     elif shift_code == "6":
@@ -346,9 +347,7 @@ def shift_to_cells(shift_code: str) -> list:
             cells[hour - 8] = "1"
 
     else:
-        raise ValueError(
-            f"Невідомий код зміни: {shift_code}"
-        )
+        raise ValueError(f"Невідомий код зміни: {shift_code}")
 
     return cells
 
