@@ -57,7 +57,7 @@ def get_worksheet():
     with _connection_lock:
         if _worksheet is not None:
             return _worksheet
-
+        
         credentials_json = os.environ.get("GOOGLE_CREDENTIALS_JSON")
 
         if not credentials_json:
@@ -577,3 +577,4 @@ def get_manager_access_record(
             return match
 
     return None
+# Railway fixed version
