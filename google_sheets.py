@@ -638,3 +638,143 @@ def get_manager_access_record(
 
     return None
 # Railway fixed version
+
+def get_managers_for_reminder(
+    only_incomplete: bool = False,
+) -> list:
+    """
+    Повертає активних менеджерів із Telegram ID.
+
+    only_incomplete=False:
+        усі активні менеджери — для нагадування о 09:00.
+
+    only_incomplete=True:
+        тільки менеджери, які ще не заповнили всі 7 днів.
+    """
+
+    manager_records = [
+        row
+        for row in _read_managers_rows()
+        if row.get("active")
+        and row.get("telegram_id")
+    ]
+
+    if not only_incomplete:
+        return manager_records
+
+    worksheet = get_worksheet()
+
+    first_schedule_row = min(DAY_START_ROWS.values())
+    last_schedule_row = max(
+        start_row + DAY_BLOCK_SIZE - 1
+        for start_row in DAY_START_ROWS.values()
+    )
+
+    # Одним запитом читаємо весь графік:
+    # колонка D — імена, колонки E:R — години.
+    with _sheet_lock:
+        schedule_values = worksheet.get(
+            f"D{first_schedule_row}:R{last_schedule_row}"
+        )
+
+    def detect_shift(row_values: list) -> str | None:
+        cells = list(row_values[:14])
+        cells += [""] * (14 - len(cells))
+
+        normalized_cells = [
+            str(value or "").strip()
+            for value in cells
+        ]
+
+        if "Вихідний 1" in normalized_cells:
+            return "4"
+
+        if "Вихідний 2" in normalized_cells:
+            return "5"
+
+        work_indexes = [
+            index
+            for index, value in enumerate(normalized_cells)
+            if value == "1"
+        ]
+
+        if work_indexes == list(range(0, 9)):
+            return "1.1"
+
+        if work_indexes == list(range(1, 10)):
+            return "1"
+
+        if work_indexes == list(range(5, 14)):
+            return "2"
+
+        if work_indexes == list(range(2, 11)):
+            return "3"
+
+        if work_indexes == list(range(1, 6)):
+            return "6"
+
+        if work_indexes == (
+            list(range(1, 6))
+            + list(range(9, 14))
+        ):
+            return "6.1"
+
+        return None
+
+    incomplete_managers = []
+
+    for manager in manager_records:
+        manager_name = manager["manager_name"]
+        search_words = get_manager_search_words(
+            manager_name
+        )
+
+        completed_days = 0
+
+        for day_code in DAY_ORDER:
+            start_row = DAY_START_ROWS[day_code]
+
+            block_start = (
+                start_row - first_schedule_row
+            )
+            block_end = (
+                block_start + DAY_BLOCK_SIZE
+            )
+
+            day_block = schedule_values[
+                block_start:block_end
+            ]
+
+            matches = []
+
+            for row_values in day_block:
+                if not row_values:
+                    continue
+
+                normalized_name = normalize_text(
+                    row_values[0]
+                )
+
+                if normalized_name and all(
+                    word in normalized_name
+                    for word in search_words
+                ):
+                    matches.append(row_values)
+
+            # Має бути знайдений рівно один рядок менеджера
+            if len(matches) != 1:
+                continue
+
+            # Перша клітинка — ім’я з колонки D.
+            # Далі йдуть 14 клітинок E:R.
+            shift_code = detect_shift(
+                matches[0][1:15]
+            )
+
+            if shift_code:
+                completed_days += 1
+
+        if completed_days < 7:
+            incomplete_managers.append(manager)
+
+    return incomplete_managers
