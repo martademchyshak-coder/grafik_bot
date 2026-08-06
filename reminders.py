@@ -166,7 +166,7 @@ async def build_admin_report(
         )
 
     return "\n".join(lines)
-    async def send_admin_report(
+async def send_admin_report(
     bot: Bot,
     report_time: str,
 ) -> None:
