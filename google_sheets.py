@@ -352,6 +352,87 @@ def shift_to_cells(shift_code: str) -> list:
 
     return cells
 
+def paint_shift(worksheet, row: int, shift_code: str) -> None:
+    purple = {
+        "red": 194 / 255,
+        "green": 123 / 255,
+        "blue": 160 / 255,
+    }
+
+    yellow = {
+        "red": 1,
+        "green": 242 / 255,
+        "blue": 204 / 255,
+    }
+
+    white = {
+        "red": 1,
+        "green": 1,
+        "blue": 1,
+    }
+
+    # Індекси всередині E:R, які треба фарбувати
+    color_ranges = {
+        "1.1": [(0, 9, yellow)],       # E:M — 08:00–16:00
+        "1": [(1, 10, purple)],        # F:N — 09:00–17:00
+        "2": [(5, 14, purple)],        # J:R — 13:00–21:00
+        "3": [(2, 11, purple)],        # G:O — 10:00–18:00
+        "4": [],                       # Вихідний — білий
+        "5": [],                       # Вихідний — білий
+        "6": [(1, 6, yellow)],         # F:J — 09:00–13:00
+        "6.1": [
+            (1, 6, yellow),            # F:J — 09:00–13:00
+            (9, 14, yellow),           # N:R — 17:00–21:00
+        ],
+    }
+
+    sheet_id = worksheet.id
+    row_index = row - 1
+
+    requests = [
+        {
+            "repeatCell": {
+                "range": {
+                    "sheetId": sheet_id,
+                    "startRowIndex": row_index,
+                    "endRowIndex": row_index + 1,
+                    "startColumnIndex": 4,
+                    "endColumnIndex": 18,
+                },
+                "cell": {
+                    "userEnteredFormat": {
+                        "backgroundColor": white,
+                    }
+                },
+                "fields": "userEnteredFormat.backgroundColor",
+            }
+        }
+    ]
+
+    for start_index, end_index, color in color_ranges.get(shift_code, []):
+        requests.append(
+            {
+                "repeatCell": {
+                    "range": {
+                        "sheetId": sheet_id,
+                        "startRowIndex": row_index,
+                        "endRowIndex": row_index + 1,
+                        "startColumnIndex": 4 + start_index,
+                        "endColumnIndex": 4 + end_index,
+                    },
+                    "cell": {
+                        "userEnteredFormat": {
+                            "backgroundColor": color,
+                        }
+                    },
+                    "fields": "userEnteredFormat.backgroundColor",
+                }
+            }
+        )
+
+    worksheet.spreadsheet.batch_update(
+        {"requests": requests}
+    )
 
 def save_one_day_for_manager(
     manager_name: str,
@@ -372,6 +453,7 @@ def save_one_day_for_manager(
             values=[shift_to_cells(shift_code)],
             value_input_option="USER_ENTERED",
         )
+        paint_shift(worksheet, manager_row, shift_code)
 
     _availability_cache.pop(day_code, None)
 
@@ -414,17 +496,17 @@ def save_schedule_for_manager(
             updates,
             value_input_option="USER_ENTERED",
         )
+     for day_code in DAY_ORDER:
+            paint_shift(
+                worksheet,
+                updated_rows[day_code],
+                schedule[day_code],
+            )
 
     for day_code in DAY_ORDER:
         _availability_cache.pop(day_code, None)
 
     return updated_rows
-def save_schedule_for_manager(manager_name: str, schedule: dict) -> dict:
-    # тут твій наявний код
-    # ...
-
-    return updated_rows
-
 
 def load_schedule_for_manager(manager_name: str) -> dict:
     worksheet = get_worksheet()
