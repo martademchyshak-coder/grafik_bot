@@ -90,9 +90,14 @@ SHIFT_EMOJI = {
 
 main_menu = ReplyKeyboardMarkup(
     keyboard=[
-        [KeyboardButton(text="/start")],
-        [KeyboardButton(text="📝 Заповнити графік")],
-        [KeyboardButton(text="📅 Мій графік")],
+        [
+            KeyboardButton(text="▶️ Start"),
+            KeyboardButton(text="📝 Заповнити графік"),
+        ],
+        [
+            KeyboardButton(text="📅 Мій графік"),
+            KeyboardButton(text="📖 Інструкція"),
+        ],
     ],
     resize_keyboard=True,
 )
@@ -436,7 +441,9 @@ async def safe_edit(message: Message, text: str, reply_markup=None):
             return
 
         await message.answer(text, reply_markup=reply_markup)
-
+@dp.message(F.text == "▶️ Start")
+async def start_button(message: Message):
+    await start(message)
 
 @dp.message(CommandStart())
 async def start(message: Message):
@@ -513,7 +520,17 @@ async def my_schedule(message: Message):
         get_schedule_card(user_id),
         reply_markup=get_saved_schedule_keyboard(),
     )
-
+@dp.message(F.text == "📖 Інструкція")
+async def instruction(message: Message):
+    await message.answer(
+        "📖 <b>Інструкція</b>\n\n"
+        "1️⃣ Натисніть <b>📝 Заповнити графік</b>.\n"
+        "2️⃣ Оберіть зміну для кожного дня.\n"
+        "3️⃣ Після заповнення всіх 7 днів натисніть <b>💾 Зберегти графік</b>.\n"
+        "4️⃣ Перевірити свій графік можна через кнопку <b>📅 Мій графік</b>.\n\n"
+        "Якщо після оновлення бота щось працює некоректно — натисніть <b>▶️ Start</b> для оновлення меню.",
+        parse_mode="HTML",
+    )
 
 @dp.callback_query(F.data.startswith("day:"))
 async def choose_day(callback: CallbackQuery):
