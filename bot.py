@@ -28,6 +28,12 @@ from google_sheets import (
     save_schedule_for_manager,
 )
 
+from reminders import (
+    ADMIN_TELEGRAM_ID,
+    build_admin_report,
+    get_admin_report_keyboard,
+    reminders_loop,
+)
 
 load_dotenv()
 TOKEN = os.getenv("BOT_TOKEN")
@@ -531,6 +537,48 @@ async def instruction(message: Message):
         "Якщо після оновлення бота щось працює некоректно — натисніть <b>▶️ Start</b> для оновлення меню.",
         parse_mode="HTML",
     )
+@dp.callback_query(F.data == "admin_refresh_incomplete")
+async def admin_refresh_incomplete(callback: CallbackQuery):
+    if callback.from_user.id != ADMIN_TELEGRAM_ID:
+        await callback.answer(
+            "⛔️ Ця кнопка доступна лише адміністратору.",
+            show_alert=True,
+        )
+        return
+
+    await callback.answer("🔄 Оновлюю список...")
+
+    report_text = await build_admin_report(
+        show_all=False,
+    )
+
+    await safe_edit(
+        callback.message,
+        report_text,
+        reply_markup=get_admin_report_keyboard(),
+    )
+
+
+@dp.callback_query(F.data == "admin_show_all")
+async def admin_show_all(callback: CallbackQuery):
+    if callback.from_user.id != ADMIN_TELEGRAM_ID:
+        await callback.answer(
+            "⛔️ Ця кнопка доступна лише адміністратору.",
+            show_alert=True,
+        )
+        return
+
+    await callback.answer("📋 Формую список...")
+
+    report_text = await build_admin_report(
+        show_all=True,
+    )
+
+    await safe_edit(
+        callback.message,
+        report_text,
+        reply_markup=get_admin_report_keyboard(),
+    )
 
 @dp.callback_query(F.data.startswith("day:"))
 async def choose_day(callback: CallbackQuery):
@@ -851,7 +899,20 @@ async def back_to_saved_schedule(callback: CallbackQuery):
 
 async def main():
     print("✅ Бот запущений")
-    await dp.start_polling(bot)
+
+    reminders_task = asyncio.create_task(
+        reminders_loop(bot)
+    )
+
+    try:
+        await dp.start_polling(bot)
+    finally:
+        reminders_task.cancel()
+
+        try:
+            await reminders_task
+        except asyncio.CancelledError:
+            pass
 
 
 if __name__ == "__main__":
