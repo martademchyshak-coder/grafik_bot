@@ -496,7 +496,7 @@ def save_schedule_for_manager(
             updates,
             value_input_option="USER_ENTERED",
         )
-     for day_code in DAY_ORDER:
+        for day_code in DAY_ORDER:
             paint_shift(
                 worksheet,
                 updated_rows[day_code],
