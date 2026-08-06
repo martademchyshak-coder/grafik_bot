@@ -419,7 +419,67 @@ def save_schedule_for_manager(
         _availability_cache.pop(day_code, None)
 
     return updated_rows
+def save_schedule_for_manager(manager_name: str, schedule: dict) -> dict:
+    # тут твій наявний код
+    # ...
 
+    return updated_rows
+
+
+def load_schedule_for_manager(manager_name: str) -> dict:
+    worksheet = get_worksheet()
+    schedule = {}
+
+    for day_code in DAY_ORDER:
+        row = find_manager_row_for_day(
+            worksheet,
+            manager_name,
+            day_code,
+        )
+
+        with _sheet_lock:
+            values = worksheet.get(
+                f"E{row}:R{row}"
+            )
+
+        row_values = values[0] if values else []
+        row_values = row_values + [""] * (14 - len(row_values))
+
+        if "Вихідний 1" in row_values:
+            schedule[day_code] = "4"
+
+        elif "Вихідний 2" in row_values:
+            schedule[day_code] = "5"
+
+        else:
+            work = [
+                index
+                for index, value in enumerate(row_values)
+                if str(value).strip() == "1"
+            ]
+
+            if work == list(range(0, 9)):
+                schedule[day_code] = "1.1"
+
+            elif work == list(range(1, 10)):
+                schedule[day_code] = "1"
+
+            elif work == list(range(5, 14)):
+                schedule[day_code] = "2"
+
+            elif work == list(range(2, 11)):
+                schedule[day_code] = "3"
+
+            elif work == list(range(1, 6)):
+                schedule[day_code] = "6"
+
+            elif work == (
+                list(range(1, 6))
+                + list(range(9, 14))
+            ):
+                schedule[day_code] = "6.1"
+
+    return schedule
 
 # =========================
 # ВКЛАДКА «МЕНЕДЖЕРИ»
