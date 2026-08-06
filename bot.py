@@ -473,16 +473,41 @@ async def fill_schedule(message: Message):
     )
 
 
-@dp.message(F.text == "📆 Мій графік")
+@dp.message(F.text == "📅 Мій графік")
 async def my_schedule(message: Message):
     user_id = message.from_user.id
+    manager_name = get_manager_name(message.from_user)
 
-    if not user_schedules.get(user_id):
+    try:
+        schedule = await asyncio.to_thread(
+            load_schedule_for_manager,
+            manager_name,
+        )
+    except Exception as error:
+        print(
+            "Помилка читання графіка: "
+            f"user_id={user_id}, "
+            f"manager={manager_name}, "
+            f"error={error}",
+            flush=True,
+        )
+
         await message.answer(
-            "⚠️ У пам’яті бота ще немає вашого графіка.\n\n"
+            "❌ Не вдалося прочитати графік із таблиці.\n\n"
+            f"Помилка: {error}"
+        )
+        return
+
+    if not schedule:
+        user_schedules.pop(user_id, None)
+
+        await message.answer(
+            "⚠️ У таблиці ще немає вашого графіка.\n\n"
             "Натисніть «📝 Заповнити графік»."
         )
         return
+
+    user_schedules[user_id] = schedule
 
     await message.answer(
         get_schedule_card(user_id),
