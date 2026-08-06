@@ -89,8 +89,9 @@ SHIFT_EMOJI = {
 
 main_menu = ReplyKeyboardMarkup(
     keyboard=[
+        [KeyboardButton(text="/start")],
         [KeyboardButton(text="📝 Заповнити графік")],
-        [KeyboardButton(text="📆 Мій графік")],
+        [KeyboardButton(text="📅 Мій графік")],
     ],
     resize_keyboard=True,
 )
