@@ -23,6 +23,7 @@ from google_sheets import (
     get_shift_group,
     get_manager_access_record,
     is_shift_available,
+    load_schedule_for_manager,
     save_one_day_for_manager,
     save_schedule_for_manager,
 )
