@@ -28,12 +28,12 @@ AVAILABILITY_CELLS = {
 
 DAY_START_ROWS = {
     "mon": 9,
-    "tue": 58,
-    "wed": 107,
-    "thu": 156,
-    "fri": 205,
-    "sat": 254,
-    "sun": 303,
+    "tue": 56,
+    "wed": 103,
+    "thu": 150,
+    "fri": 197,
+    "sat": 244,
+    "sun": 291,
 }
 
 DAY_ORDER = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
