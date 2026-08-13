@@ -37,7 +37,7 @@ DAY_START_ROWS = {
 }
 
 DAY_ORDER = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
-DAY_BLOCK_SIZE = 49
+DAY_BLOCK_SIZE = 47
 
 _client = None
 _spreadsheet = None
