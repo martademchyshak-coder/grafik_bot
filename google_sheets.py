@@ -131,7 +131,7 @@ def _read_availability_cells(day_code: str) -> dict:
     worksheet = get_worksheet()
     cells = AVAILABILITY_CELLS[day_code]
 
-    for attempt in range(4):
+for attempt in range(4):
     try:
         with _sheet_lock:
             values = worksheet.batch_get(
