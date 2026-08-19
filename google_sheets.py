@@ -6,6 +6,7 @@ import time
 from typing import Dict, List, Tuple
 
 import gspread
+from gspread.exceptions import APIError
 from google.oauth2.service_account import Credentials
 
 
@@ -14,7 +15,8 @@ SHEET_NAME = "Прихована копія"
 MANAGERS_SHEET_NAME = "Менеджери"
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
-AVAILABILITY_CACHE_TTL = 5
+AVAILABILITY_CACHE_TTL = 30
+MANAGERS_CACHE_TTL = 60
 
 AVAILABILITY_CELLS = {
     "mon": {"first": "C2", "second": "C3", "days_off": "C4"},
@@ -49,7 +51,9 @@ _sheet_lock = threading.RLock()
 
 _availability_cache: Dict[str, Tuple[float, dict]] = {}
 _manager_row_cache: Dict[Tuple[str, str], int] = {}
-
+_manager_day_cells_cache = {}
+_managers_rows_cache = None
+_managers_rows_cache_time = 0.0
 
 def get_worksheet():
     global _client, _spreadsheet, _worksheet
@@ -95,9 +99,14 @@ def reset_connection_cache():
 
 
 def clear_runtime_cache():
+    global _managers_rows_cache, _managers_rows_cache_time
+
     _availability_cache.clear()
     _manager_row_cache.clear()
+    _manager_day_cells_cache.clear()
 
+    _managers_rows_cache = None
+    _managers_rows_cache_time = 0.0
 
 def check_connection() -> dict:
     worksheet = get_worksheet()
@@ -122,14 +131,25 @@ def _read_availability_cells(day_code: str) -> dict:
     worksheet = get_worksheet()
     cells = AVAILABILITY_CELLS[day_code]
 
-    with _sheet_lock:
-        values = worksheet.batch_get(
-            [
-                cells["first"],
-                cells["second"],
-                cells["days_off"],
-            ]
-        )
+    for attempt in range(4):
+    try:
+        with _sheet_lock:
+            values = worksheet.batch_get(
+                [
+                    cells["first"],
+                    cells["second"],
+                    cells["days_off"],
+                ]
+            )
+        break
+    except APIError as e:
+        if getattr(e.response, "status_code", None) != 429:
+            raise
+
+        if attempt == 3:
+            raise
+
+        time.sleep(2 ** attempt)
 
     def extract(index: int):
         try:
@@ -212,7 +232,7 @@ def get_shift_group(shift_code: str) -> str:
 def is_shift_available(
     day_code: str,
     shift_code: str,
-    force_refresh: bool = True,
+    force_refresh: bool = False  ,
 ) -> bool:
     availability = get_shift_availability(
         day_code,
@@ -274,10 +294,15 @@ def find_manager_row_for_day(
     start_row = DAY_START_ROWS[day_code]
     end_row = start_row + DAY_BLOCK_SIZE - 1
 
+    if day_code in _manager_day_cells_cache:
+    manager_cells = _manager_day_cells_cache[day_code]
+else:
     with _sheet_lock:
         manager_cells = worksheet.get(
             f"D{start_row}:D{end_row}"
         )
+
+    _manager_day_cells_cache[day_code] = manager_cells
 
     matches = []
 
@@ -625,10 +650,35 @@ def normalize_telegram_id(value) -> str:
 
 
 def _read_managers_rows() -> list:
+    global _managers_rows_cache, _managers_rows_cache_time
+
+    now = time.monotonic()
+
+    if (
+        _managers_rows_cache is not None
+        and now - _managers_rows_cache_time < MANAGERS_CACHE_TTL
+    ):
+        return [
+            dict(row)
+            for row in _managers_rows_cache
+        ]
+
     worksheet = get_managers_worksheet()
 
-    with _sheet_lock:
-        values = worksheet.get("A2:E")
+    for attempt in range(4):
+        try:
+            with _sheet_lock:
+                values = worksheet.get("A2:E")
+            break
+
+        except APIError as e:
+            if getattr(e.response, "status_code", None) != 429:
+                raise
+
+            if attempt == 3:
+                raise
+
+            time.sleep(2 ** attempt)
 
     rows = []
 
@@ -653,7 +703,7 @@ def _read_managers_rows() -> list:
             {
                 "row": sheet_row,
                 "manager_name": str(
-        manager_name or ""
+                    manager_name or ""
                 ).strip(),
                 "telegram_id": normalize_telegram_id(
                     telegram_id
@@ -666,8 +716,13 @@ def _read_managers_rows() -> list:
             }
         )
 
-    return rows
+    _managers_rows_cache = rows
+    _managers_rows_cache_time = now
 
+    return [
+        dict(row)
+        for row in rows
+    ]
 
 def get_manager_access_record(
     telegram_id: int | str,
