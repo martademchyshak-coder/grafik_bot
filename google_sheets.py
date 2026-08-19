@@ -296,7 +296,7 @@ def find_manager_row_for_day(
 
     if day_code in _manager_day_cells_cache:
         manager_cells = _manager_day_cells_cache[day_code]
-else:
+    else:
     with _sheet_lock:
         manager_cells = worksheet.get(
             f"D{start_row}:D{end_row}"
