@@ -151,17 +151,17 @@ for attempt in range(4):
 
         time.sleep(2 ** attempt)
 
-    def extract(index: int):
-        try:
-            return values[index][0][0]
-        except (IndexError, TypeError):
-            return None
+        def extract(index: int):
+                try:
+                        return values[index][0][0]
+                except (IndexError, TypeError):
+                        return None
 
-    return {
-        "first": value_to_number(extract(0)),
-        "second": value_to_number(extract(1)),
-        "days_off": value_to_number(extract(2)),
-    }
+        return {
+                "first": value_to_number(extract(0)),
+                "second": value_to_number(extract(1)),
+                "days_off": value_to_number(extract(2)),
+        }
 
 
 def get_day_free_places(
