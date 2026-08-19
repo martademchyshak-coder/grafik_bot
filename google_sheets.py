@@ -131,38 +131,38 @@ def _read_availability_cells(day_code: str) -> dict:
     worksheet = get_worksheet()
     cells = AVAILABILITY_CELLS[day_code]
 
-for attempt in range(4):
-    try:
-        with _sheet_lock:
-            values = worksheet.batch_get(
-                [
-                    cells["first"],
-                    cells["second"],
-                    cells["days_off"],
-                ]
-            )
-        break
-    except APIError as e:
-        if getattr(e.response, "status_code", None) != 429:
-            raise
+    for attempt in range(4):
+        try:
+            with _sheet_lock:
+                values = worksheet.batch_get(
+                    [
+                        cells["first"],
+                        cells["second"],
+                        cells["days_off"],
+                    ]
+                )
+            break
 
-        if attempt == 3:
-            raise
+        except APIError as e:
+            if getattr(e.response, "status_code", None) != 429:
+                raise
 
-        time.sleep(2 ** attempt)
+            if attempt == 3:
+                raise
 
-        def extract(index: int):
-                try:
-                        return values[index][0][0]
-                except (IndexError, TypeError):
-                        return None
+            time.sleep(2 ** attempt)
 
-        return {
-                "first": value_to_number(extract(0)),
-                "second": value_to_number(extract(1)),
-                "days_off": value_to_number(extract(2)),
-        }
+    def extract(index: int):
+        try:
+            return values[index][0][0]
+        except (IndexError, TypeError):
+            return None
 
+    return {
+        "first": value_to_number(extract(0)),
+        "second": value_to_number(extract(1)),
+        "days_off": value_to_number(extract(2)),
+    }
 
 def get_day_free_places(
     day_code: str,
