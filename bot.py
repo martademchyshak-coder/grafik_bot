@@ -498,7 +498,11 @@ async def fill_schedule(message: Message):
     schedule = {}
 
     user_schedules[user_id] = schedule
-
+    print(
+        f"AFTER_SAVE: user_id={user_id}, "
+    f"user_schedule={user_schedules.get(user_id)}",
+            flush=True,
+        )
     await message.answer(
         build_fill_text(user_id),
         reply_markup=get_week_keyboard(user_id),
