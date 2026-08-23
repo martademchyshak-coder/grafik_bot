@@ -553,7 +553,7 @@ def load_schedule_for_manager(manager_name: str) -> dict:
         row_values = row_values + [""] * (14 - len(row_values))
 
         if "Вихідний 1" in row_values:
-    schedule[day_code] = "4"
+            schedule[day_code] = "4"
 
         elif "Вихідний 2" in row_values:
             schedule[day_code] = "5"
