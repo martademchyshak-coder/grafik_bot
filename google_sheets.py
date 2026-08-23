@@ -15,7 +15,7 @@ SHEET_NAME = "Прихована копія"
 MANAGERS_SHEET_NAME = "Менеджери"
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
-AVAILABILITY_CACHE_TTL = 30
+AVAILABILITY_CACHE_TTL = 10
 MANAGERS_CACHE_TTL = 60
 
 AVAILABILITY_CELLS = {
