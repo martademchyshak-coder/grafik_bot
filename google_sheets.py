@@ -831,7 +831,10 @@ def get_managers_for_reminder(
 
         if "Вихідний 2" in normalized_cells:
             return "5"
-
+            
+        if "Відпустка" in normalized_cells:
+            return "7"
+             
         work_indexes = [
             index
             for index, value in enumerate(normalized_cells)
