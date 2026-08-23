@@ -485,6 +485,11 @@ async def fill_schedule(message: Message):
         load_schedule_for_manager,
         manager_name,
         )
+        print(
+            f"FILL_SCHEDULE: manager={manager_name}, "
+            f"schedule={schedule}",
+            flush=True,
+        )
     except Exception as error:
         print(
         f"Помилка читання графіка: {error}",
