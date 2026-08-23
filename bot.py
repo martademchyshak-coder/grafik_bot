@@ -492,10 +492,10 @@ async def fill_schedule(message: Message):
         )
     except Exception as error:
         print(
-        f"Помилка читання графіка: {error}",
-        flush=True,
+            f"Помилка читання графіка: {error}",
+            flush=True,
     )
-    schedule = {}
+        schedule = {}
 
     user_schedules[user_id] = schedule
     print(
