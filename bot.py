@@ -265,8 +265,8 @@ def get_week_keyboard(user_id: int) -> InlineKeyboardMarkup:
     buttons.append(
         [
             InlineKeyboardButton(
-                text="💾 Зберегти графік",
-                callback_data="save_schedule",
+                text="✅ Завершити заповнення",
+                callback_data="save_schedule"
             )
         ]
     )
@@ -686,119 +686,48 @@ async def save_schedule(callback: CallbackQuery):
         return
 
     user_id = callback.from_user.id
-    schedule = dict(user_schedules.get(user_id, {}))
-
-    if len(schedule) != 7:
-        await callback.answer(
-            "❌ Спочатку заповніть усі 7 днів.",
-            show_alert=True,
-        )
-        return
-
-    # Окреме блокування лише для цього менеджера.
-    # Інших менеджерів воно не зачіпає.
-    user_lock = user_save_locks.setdefault(
-        user_id,
-        asyncio.Lock(),
-    )
-
-    if user_lock.locked():
-        await callback.answer(
-            "⏳ Ваш графік уже зберігається.",
-            show_alert=True,
-        )
-        return
-
     manager_name = get_manager_name(callback.from_user)
 
-    await callback.answer("⏳ Зберігаю графік...")
+    try:
+        schedule = await asyncio.to_thread(
+            load_schedule_for_manager,
+            manager_name,
+        )
+    except Exception as error:
+        print(
+            f"Помилка читання графіка при завершенні: {error}",
+            flush=True,
+        )
+        await callback.answer(
+            "❌ Не вдалося перевірити графік. Спробуйте ще раз.",
+            show_alert=True,
+        )
+        return
 
-    async with user_lock:
+    user_schedules[user_id] = schedule
+
+    if len(schedule) != 7:
         await safe_edit(
             callback.message,
-            "⏳ Зберігаю графік у таблицю...\n\n"
-            "Будь ласка, зачекайте кілька секунд.",
+            build_fill_text(
+                user_id,
+                "⚠️ Ще не всі 7 днів заповнені.",
+            ),
+            reply_markup=get_week_keyboard(user_id),
         )
+        await callback.answer(
+            "⚠️ Заповніть усі 7 днів.",
+            show_alert=True,
+        )
+        return
 
-        try:
-            # Інші менеджери можуть у цей час користуватися ботом.
-            # У коротку чергу ставиться лише фінальна перевірка
-            # місць і сам запис у Google Sheets.
-            async with sheet_write_lock:
-                unavailable_days = []
+    await safe_edit(
+        callback.message,
+        get_schedule_card(user_id),
+        reply_markup=get_saved_schedule_keyboard(),
+    )
 
-                for day_code, shift_code in schedule.items():
-                    available = await asyncio.to_thread(
-                        is_shift_available,
-                        day_code,
-                        shift_code,
-                        True,
-                    )
-
-                    if not available:
-                        unavailable_days.append(DAYS[day_code])
-
-                if unavailable_days:
-                    await callback.message.answer(
-                        "❌ Поки ви заповнювали графік, "
-                        "місця закінчилися для:\n\n"
-                        + "\n".join(
-                            f"• {day}"
-                            for day in unavailable_days
-                        )
-                        + "\n\nОберіть інші зміни для цих днів."
-                    )
-
-                    await safe_edit(
-                        callback.message,
-                        build_fill_text(
-                            user_id,
-                            "⚠️ Потрібно змінити переповнені дні.",
-                        ),
-                        reply_markup=get_week_keyboard(user_id),
-                    )
-                    return
-
-                updated_rows = await asyncio.to_thread(
-                    save_schedule_for_manager,
-                    manager_name,
-                    schedule,
-                )
-
-            # Повідомляємо про успіх тільки після запису всіх 7 днів.
-            if not isinstance(updated_rows, dict):
-                raise RuntimeError(
-                    "Функція запису не повернула підтвердження."
-                )
-
-            if len(updated_rows) != 7:
-                raise RuntimeError(
-                    f"Записано лише {len(updated_rows)} із 7 днів."
-                )
-
-            await safe_edit(
-                callback.message,
-                get_schedule_card(user_id),
-                reply_markup=get_saved_schedule_keyboard(),
-            )
-
-        except Exception as error:
-            print(
-                "Помилка збереження графіка: "
-                f"user_id={user_id}, "
-                f"manager={manager_name}, "
-                f"error={error}",
-                flush=True,
-            )
-
-            await callback.message.answer(
-                "❌ Графік не записано в таблицю.\n\n"
-                f"Помилка: {error}\n\n"
-                "Натисніть «Зберегти графік» ще раз."
-            )
-
-        finally:
-            user_save_locks.pop(user_id, None)
+    await callback.answer("✅ Графік успішно завершено")
 
 @dp.callback_query(F.data == "edit_schedule")
 async def edit_schedule(callback: CallbackQuery):
