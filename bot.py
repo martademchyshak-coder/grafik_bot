@@ -648,7 +648,7 @@ async def choose_shift(callback: CallbackQuery):
 
     user_schedules.setdefault(user_id, {})
     user_schedules[user_id][day_code] = shift_code
-        manager_name = get_manager_name(callback.from_user)
+    manager_name = get_manager_name(callback.from_user)
     
     try:
         await asyncio.to_thread(
