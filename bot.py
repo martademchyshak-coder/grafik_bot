@@ -648,7 +648,22 @@ async def choose_shift(callback: CallbackQuery):
 
     user_schedules.setdefault(user_id, {})
     user_schedules[user_id][day_code] = shift_code
+    manager_name = get_manager_name(callback.from_user)
 
+try:
+    await asyncio.to_thread(
+        save_one_day_for_manager,
+        manager_name,
+        day_code,
+        shift_code,
+    )
+except Exception as error:
+    print(f"Помилка збереження одного дня: {error}", flush=True)
+    await callback.answer(
+        "❌ Не вдалося зберегти зміну. Спробуйте ще раз.",
+        show_alert=True,
+    )
+    return
     await safe_edit(
         callback.message,
         build_fill_text(
