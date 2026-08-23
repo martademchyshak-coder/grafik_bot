@@ -478,13 +478,27 @@ async def fill_schedule(message: Message):
         return
 
     user_id = message.from_user.id
-    user_schedules[user_id] = {}
+    manager_name = get_manager_name(message.from_user)
+
+    try:
+        schedule = await asyncio.to_thread(
+        load_schedule_for_manager,
+        manager_name,
+        )
+    except Exception as error:
+        print(
+        f"Помилка читання графіка: {error}",
+        flush=True,
+    )
+    schedule = {}
+
+    user_schedules[user_id] = schedule
 
     await message.answer(
         build_fill_text(user_id),
         reply_markup=get_week_keyboard(user_id),
     )
-
+ 
 
 @dp.message(F.text == "📅 Мій графік")
 async def my_schedule(message: Message):
