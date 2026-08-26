@@ -562,6 +562,26 @@ async def instruction(message: Message):
         "Якщо після оновлення бота щось працює некоректно — натисніть <b>▶️ Start</b> для оновлення меню.",
         parse_mode="HTML",
     )
+@dp.callback_query(F.data.startswith("refresh_shifts:"))
+async def refresh_shifts(callback: CallbackQuery):
+    if not await ensure_schedule_access(callback.from_user, callback.message):
+        await callback.answer()
+        return
+
+    _, day_code, edit_flag = callback.data.split(":")
+    edit_mode = edit_flag == "1"
+
+    await safe_edit(
+        callback.message,
+        f"🗓 {DAYS[day_code]}\n\nМісця оновлено. Оберіть зміну:",
+        reply_markup=await get_shifts_keyboard(
+            day_code,
+            edit_mode=edit_mode,
+        ),
+    )
+
+    await callback.answer("Місця оновлено 🔄")
+    
 @dp.callback_query(F.data == "admin_refresh_incomplete")
 async def admin_refresh_incomplete(callback: CallbackQuery):
     if callback.from_user.id != ADMIN_TELEGRAM_ID:
