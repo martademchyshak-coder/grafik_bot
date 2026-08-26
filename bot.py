@@ -582,6 +582,22 @@ async def refresh_shifts(callback: CallbackQuery):
 
     await callback.answer("Місця оновлено 🔄")
     
+@dp.callback_query(F.data == "back_to_week")
+async def back_to_week(callback: CallbackQuery):
+    if not await ensure_schedule_access(callback.from_user, callback.message):
+        await callback.answer()
+        return
+
+    user_id = callback.from_user.id
+
+    await safe_edit(
+        callback.message,
+        build_fill_text(user_id),
+        reply_markup=get_week_keyboard(user_id),
+    )
+
+    await callback.answer()
+
 @dp.callback_query(F.data == "admin_refresh_incomplete")
 async def admin_refresh_incomplete(callback: CallbackQuery):
     if callback.from_user.id != ADMIN_TELEGRAM_ID:
