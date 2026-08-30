@@ -256,8 +256,9 @@ def get_week_keyboard(user_id: int) -> InlineKeyboardMarkup:
                         text = f"📝 {DAY_SHORT[day_code]} {manual_text}"
                     else:
                         text = f"✅ {DAY_SHORT[day_code]} {SHIFTS[shift_code]}"
-                    else:
-                        text = f"▫️ {DAY_SHORT[day_code]} - не вибрано"
+            else:
+                text = f"▫️ {DAY_SHORT[day_code]} - не вибрано"
+                        
 
             row.append(
                 InlineKeyboardButton(
