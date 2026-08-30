@@ -556,22 +556,22 @@ def load_schedule_for_manager(manager_name: str) -> dict:
             schedule[day_code] = "4"
 
         elif "Вихідний 2" in row_values:
-           schedule[day_code] = "5"
+            schedule[day_code] = "5"
 
         else:
-           manual_text = next(
-        (
-            str(value).strip()
-            for value in row_values
-            if str(value).strip()
-            and str(value).strip() != "1"
-        ),
-        None,
-    )
+            manual_text = next(
+                (
+                    str(value).strip()
+                    for value in row_values
+                    if str(value).strip()
+                    and str(value).strip() != "1"
+                ),
+                None,
+            )
 
-           if manual_text:
-              schedule[day_code] = f"manual:{manual_text}"
-              continue
+            if manual_text:
+                schedule[day_code] = f"manual:{manual_text}"
+                continue
 
             work = [
                 index
