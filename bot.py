@@ -406,11 +406,15 @@ def get_schedule_card(user_id: int) -> str:
         shift_code = schedule.get(day_code)
 
         if shift_code:
-            emoji = SHIFT_EMOJI[shift_code]
-            shift_text = SHIFTS[shift_code]
+            if str(shift_code).startswith("manual:"):
+                emoji = "📝"
+                shift_text = str(shift_code).split(":", 1)[1]
+            else:
+                emoji = SHIFT_EMOJI.get(shift_code, "📌")
+                shift_text = SHIFTS.get(shift_code, str(shift_code))
         else:
             emoji = "▫️"
-            shift_text = "не вибрано"
+            shift_text = "Не вибрано"
 
         lines.append(f"{emoji} {DAY_SHORT[day_code]}   {shift_text}")
 
