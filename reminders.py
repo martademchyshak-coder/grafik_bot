@@ -262,7 +262,8 @@ async def reminders_loop(bot: Bot) -> None:
                 current_time = now.strftime(
                     "%H:%M"
                 )
-
+            if "09:00" <= current_time < "10:00":
+                current_time = "09:00"
                 # Розсилка менеджерам
                 reminder_event = (
                     current_date,
