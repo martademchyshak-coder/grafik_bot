@@ -579,13 +579,6 @@ def load_schedule_for_manager(manager_name: str) -> dict:
                 if str(value).strip() == "1"
             ]
 
-        else:
-            work = [
-                index
-                for index, value in enumerate(row_values)
-                if str(value).strip() == "1"
-            ]
-
             if work == list(range(0, 9)):
                 schedule[day_code] = "1.1"
 
