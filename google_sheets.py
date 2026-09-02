@@ -30,16 +30,16 @@ AVAILABILITY_CELLS = {
 
 DAY_START_ROWS = {
     "mon": 9,
-    "tue": 81,
-    "wed": 153,
-    "thu": 225,
-    "fri": 297,
-    "sat": 369,
-    "sun": 441,
+    "tue": 77,
+    "wed": 145,
+    "thu": 213,
+    "fri": 281,
+    "sat": 349,
+    "sun": 417,
 }
 
 DAY_ORDER = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
-DAY_BLOCK_SIZE = 72
+DAY_BLOCK_SIZE = 68
 
 _client = None
 _spreadsheet = None
