@@ -677,7 +677,7 @@ async def choose_shift(callback: CallbackQuery):
     user_id = callback.from_user.id
 
     available = await asyncio.to_thread(
-        is_shift_available, day_code, shift_code, True
+        is_shift_available, day_code, shift_code, False
     )
     if not available:
         await callback.answer(
