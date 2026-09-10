@@ -478,7 +478,11 @@ def save_one_day_for_manager(
             values=[shift_to_cells(shift_code)],
             value_input_option="USER_ENTERED",
         )
-        paint_shift(worksheet, manager_row, shift_code)
+        threading.Thread(
+    target=paint_shift,
+    args=(worksheet, manager_row, shift_code),
+    daemon=True,
+).start()
 
     _availability_cache.pop(day_code, None)
 
