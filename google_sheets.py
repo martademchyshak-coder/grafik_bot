@@ -536,21 +536,43 @@ def save_schedule_for_manager(
 def load_schedule_for_manager(manager_name: str) -> dict:
     worksheet = get_worksheet()
     schedule = {}
+    manager_words = get_manager_search_words(manager_name)
 
-    for day_code in DAY_ORDER:
-        row = find_manager_row_for_day(
-            worksheet,
-            manager_name,
-            day_code,
-        )
+    ranges = [
+        f"D{DAY_START_ROWS[day_code]}:R{DAY_START_ROWS[day_code] + DAY_BLOCK_SIZE - 1}"
+        for day_code in DAY_ORDER
+    ]
 
-        with _sheet_lock:
-            values = worksheet.get(
-                f"E{row}:R{row}"
+    with _sheet_lock:
+        day_blocks = worksheet.batch_get(ranges)
+
+    for day_code, day_block in zip(DAY_ORDER, day_blocks):
+        matches = []
+
+        for row_values in day_block:
+            if not row_values:
+                continue
+
+            normalized_name = normalize_text(row_values[0])
+
+            if normalized_name and all(
+                word in normalized_name
+                for word in manager_words
+            ):
+                matches.append(row_values)
+
+        if not matches:
+            raise ValueError(
+                f"Менеджера «{manager_name}» не знайдено для дня {day_code}."
             )
 
-        row_values = values[0] if values else []
-        row_values = row_values + [""] * (14 - len(row_values))
+        if len(matches) > 1:
+            raise ValueError(
+                f"Знайдено кілька рядків менеджера «{manager_name}» для дня {day_code}."
+            )
+
+        row_values = list(matches[0][1:15])
+        row_values += [""] * (14 - len(row_values))
 
         if "Вихідний 1" in row_values:
             schedule[day_code] = "4"
@@ -581,19 +603,14 @@ def load_schedule_for_manager(manager_name: str) -> dict:
 
             if work == list(range(0, 9)):
                 schedule[day_code] = "1.1"
-
             elif work == list(range(1, 10)):
                 schedule[day_code] = "1"
-
             elif work == list(range(5, 14)):
                 schedule[day_code] = "2"
-
             elif work == list(range(2, 11)):
                 schedule[day_code] = "3"
-
             elif work == list(range(1, 6)):
                 schedule[day_code] = "6"
-
             elif work == (
                 list(range(1, 6))
                 + list(range(9, 14))
