@@ -264,6 +264,17 @@ async def reminders_loop(bot: Bot) -> None:
                 )
             if "09:00" <= current_time < "10:00":
                 current_time = "09:00"
+            elif "16:00" <= current_time < "17:00":
+                current_time = "16:00"
+            elif "18:00" <= current_time < "19:00":
+                current_time = "18:00"
+            elif "19:45" <= current_time < "20:00":
+                current_time = "19:45"
+
+           if (
+                current_time in REMINDER_MESSAGES
+                or current_time in ADMIN_REPORT_TIMES
+           ):
                 # Розсилка менеджерам
                 reminder_event = (
                     current_date,
