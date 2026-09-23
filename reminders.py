@@ -270,8 +270,8 @@ async def reminders_loop(bot: Bot) -> None:
                 current_time = "18:00"
             elif "19:45" <= current_time < "20:00":
                 current_time = "19:45"
-
-           if (
+                
+            if (
                 current_time in REMINDER_MESSAGES
                 or current_time in ADMIN_REPORT_TIMES
            ):
