@@ -458,7 +458,155 @@ def paint_shift(worksheet, row: int, shift_code: str) -> None:
     worksheet.spreadsheet.batch_update(
         {"requests": requests}
     )
+def repaint_full_schedule() -> int:
+    worksheet = get_worksheet()
 
+    purple = {
+        "red": 194 / 255,
+        "green": 123 / 255,
+        "blue": 160 / 255,
+    }
+
+    yellow = {
+        "red": 1,
+        "green": 242 / 255,
+        "blue": 204 / 255,
+    }
+
+    white = {
+        "red": 1,
+        "green": 1,
+        "blue": 1,
+    }
+
+    color_ranges = {
+        "1.1": [(0, 9, yellow)],
+        "1": [(1, 10, purple)],
+        "2": [(5, 14, purple)],
+        "3": [(2, 11, purple)],
+        "4": [],
+        "5": [],
+        "6": [(1, 6, yellow)],
+        "6.1": [
+            (1, 6, yellow),
+            (9, 14, yellow),
+        ],
+    }
+
+    ranges = [
+        f"D{DAY_START_ROWS[day_code]}:R"
+        f"{DAY_START_ROWS[day_code] + DAY_BLOCK_SIZE - 1}"
+        for day_code in DAY_ORDER
+    ]
+
+    with _sheet_lock:
+        day_blocks = worksheet.batch_get(ranges)
+
+    sheet_id = worksheet.id
+    requests = []
+    repainted = 0
+
+    for day_code, day_block in zip(DAY_ORDER, day_blocks):
+        start_row = DAY_START_ROWS[day_code]
+
+        for offset, row_values in enumerate(day_block):
+            if not row_values:
+                continue
+
+            manager_name = str(row_values[0] or "").strip()
+            if not manager_name:
+                continue
+
+            cells = list(row_values[1:15])
+            cells += [""] * (14 - len(cells))
+            cells = [str(value or "").strip() for value in cells]
+
+            if "Вихідний 1" in cells:
+                shift_code = "4"
+            elif "Вихідний 2" in cells:
+                shift_code = "5"
+            else:
+                work = [
+                    index
+                    for index, value in enumerate(cells)
+                    if value == "1"
+                ]
+
+                if work == list(range(0, 9)):
+                    shift_code = "1.1"
+                elif work == list(range(1, 10)):
+                    shift_code = "1"
+                elif work == list(range(5, 14)):
+                    shift_code = "2"
+                elif work == list(range(2, 11)):
+                    shift_code = "3"
+                elif work == list(range(1, 6)):
+                    shift_code = "6"
+                elif work == (
+                    list(range(1, 6))
+                    + list(range(9, 14))
+                ):
+                    shift_code = "6.1"
+                elif any(cells):
+                    shift_code = "manual"
+                else:
+                    continue
+
+            row_index = start_row + offset - 1
+
+            requests.append(
+                {
+                    "repeatCell": {
+                        "range": {
+                            "sheetId": sheet_id,
+                            "startRowIndex": row_index,
+                            "endRowIndex": row_index + 1,
+                            "startColumnIndex": 4,
+                            "endColumnIndex": 18,
+                        },
+                        "cell": {
+                            "userEnteredFormat": {
+                                "backgroundColor": white,
+                            }
+                        },
+                        "fields": "userEnteredFormat.backgroundColor",
+                    }
+                }
+            )
+
+            for start_index, end_index, color in color_ranges.get(
+                shift_code,
+                [],
+            ):
+                requests.append(
+                    {
+                        "repeatCell": {
+                            "range": {
+                                "sheetId": sheet_id,
+                                "startRowIndex": row_index,
+                                "endRowIndex": row_index + 1,
+                                "startColumnIndex": 4 + start_index,
+                                "endColumnIndex": 4 + end_index,
+},
+                            "cell": {
+                                "userEnteredFormat": {
+                                    "backgroundColor": color,
+                                }
+                            },
+                            "fields": "userEnteredFormat.backgroundColor",
+                        }
+                    }
+                )
+
+            repainted += 1
+
+    with _sheet_lock:
+        for start in range(0, len(requests), 200):
+            worksheet.spreadsheet.batch_update(
+                {"requests": requests[start:start + 200]}
+            )
+
+    return repainted
 def save_one_day_for_manager(
     manager_name: str,
     day_code: str,
@@ -893,7 +1041,8 @@ def get_managers_for_reminder(
             + list(range(9, 14))
         ):
             return "6.1"
-
+        if any(normalized_cells):
+            return "manual"
         return None
 
     incomplete_managers = []
