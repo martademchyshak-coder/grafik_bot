@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo
 from aiogram import Bot
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-from google_sheets import get_managers_for_reminder
+from google_sheets import get_managers_for_reminder, repaint_full_schedule
 
 
 KYIV_TZ = ZoneInfo("Europe/Kyiv")
@@ -310,7 +310,27 @@ async def reminders_loop(bot: Bot) -> None:
                         bot,
                         current_time,
                     )
+            if "20:05" <= current_time < "21:00":
+                repaint_event = (
+                    current_date,
+                    "repaint",
+                    "20:05",
+                )
 
+                if repaint_event not in sent_events:
+                    repainted = await asyncio.to_thread(
+                        repaint_full_schedule
+                    )
+
+                    sent_events.add(repaint_event)
+
+                    await bot.send_message(
+                        chat_id=ADMIN_TELEGRAM_ID,
+                        text=(
+                            "🎨 Перевірку фарбування завершено.\n"
+                            f"Оброблено рядків: {repainted}"
+                        ),
+                    )
             # Прибираємо старі записи за попередні дні
             today = now.strftime("%Y-%m-%d")
 
