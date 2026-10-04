@@ -551,7 +551,8 @@ def repaint_full_schedule() -> int:
                     shift_code = "manual"
                 else:
                     continue
-
+                if shift_code == "manual":
+                    continue
             row_index = start_row + offset - 1
 
             requests.append(
@@ -626,11 +627,6 @@ def save_one_day_for_manager(
             values=[shift_to_cells(shift_code)],
             value_input_option="USER_ENTERED",
         )
-        threading.Thread(
-    target=paint_shift,
-    args=(worksheet, manager_row, shift_code),
-    daemon=True,
-).start()
 
     _availability_cache.pop(day_code, None)
 
