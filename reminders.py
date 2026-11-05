@@ -41,9 +41,6 @@ REMINDER_MESSAGES = {
 
 ADMIN_REPORT_TIMES = {
     "16:00",
-    "18:00",
-    "19:45",
-    "20:00",
 }
 
 
@@ -169,7 +166,7 @@ async def build_admin_report(
 async def send_admin_report(
     bot: Bot,
     report_time: str,
-) -> None:
+) -> bool:
     try:
         report_text = await build_admin_report(
             report_time=report_time,
@@ -187,6 +184,7 @@ async def send_admin_report(
             f"надіслано о {report_time}",
             flush=True,
         )
+        return True
 
     except Exception as error:
         print(
@@ -194,6 +192,7 @@ async def send_admin_report(
             f"адміністратору: {error}",
             flush=True,
         )
+        return False
 
 
 async def send_schedule_reminders(
@@ -253,98 +252,52 @@ async def reminders_loop(bot: Bot) -> None:
     while True:
         try:
             now = datetime.now(KYIV_TZ)
+            current_date = now.strftime("%Y-%m-%d")
+            current_time = now.strftime("%H:%M")
 
-            # Усе працює тільки щочетверга
+            # Нагадування, звіт і замальовування — тільки щочетверга.
             if now.weekday() == 3:
-                current_date = now.strftime(
-                    "%Y-%m-%d"
-                )
-                current_time = now.strftime(
-                    "%H:%M"
-                )
-            if "09:00" <= current_time < "10:00":
-                current_time = "09:00"
-            elif "16:00" <= current_time < "17:00":
-                current_time = "16:00"
-            elif "18:00" <= current_time < "19:00":
-                current_time = "18:00"
-            elif "19:45" <= current_time < "20:00":
-                current_time = "19:45"
-                
-            if (
-                current_time in REMINDER_MESSAGES
-                or current_time in ADMIN_REPORT_TIMES
-           ):
-                # Розсилка менеджерам
-                reminder_event = (
-                    current_date,
-                    "manager",
-                    current_time,
-                )
+                reminder_time = None
+                if "09:00" <= current_time < "10:00":
+                    reminder_time = "09:00"
+                elif "16:00" <= current_time < "17:00":
+                    reminder_time = "16:00"
+                elif "18:00" <= current_time < "19:00":
+                    reminder_time = "18:00"
+                elif "19:45" <= current_time < "20:00":
+                    reminder_time = "19:45"
 
-                if (
-                    current_time in REMINDER_MESSAGES
-                    and reminder_event not in sent_events
-                ):
-                    sent_events.add(reminder_event)
+                if reminder_time in REMINDER_MESSAGES:
+                    reminder_event = (current_date, "manager", reminder_time)
+                    if reminder_event not in sent_events:
+                        sent_events.add(reminder_event)
+                        await send_schedule_reminders(bot, reminder_time)
 
-                    await send_schedule_reminders(
-                        bot,
-                        current_time,
-                    )
+                # Звіт керівнику тільки о 16:00.
+                if "16:00" <= current_time < "16:30":
+                    admin_event = (current_date, "admin", "16:00")
+                    if admin_event not in sent_events:
+                        if await send_admin_report(bot, "16:00"):
+                            sent_events.add(admin_event)
 
-                # Особистий звіт Марті
-                admin_event = (
-                    current_date,
-                    "admin",
-                    current_time,
-                )
+                # Замальовування з 16:05, один раз за четвер.
+                if "16:05" <= current_time < "17:00":
+                    repaint_event = (current_date, "repaint", "16:05")
+                    if repaint_event not in sent_events:
+                        repainted = await asyncio.to_thread(repaint_full_schedule)
+                        sent_events.add(repaint_event)
+                        await bot.send_message(
+                            chat_id=ADMIN_TELEGRAM_ID,
+                            text=(
+                                "🎨 Перевірку фарбування завершено.\n"
+                                f"Оброблено рядків: {repainted}"
+                            ),
+                        )
 
-                if (
-                    current_time in ADMIN_REPORT_TIMES
-                    and admin_event not in sent_events
-                ):
-                    sent_events.add(admin_event)
-
-                    await send_admin_report(
-                        bot,
-                        current_time,
-                    )
-            if "20:05" <= current_time < "21:00":
-                repaint_event = (
-                    current_date,
-                    "repaint",
-                    "20:05",
-                )
-
-                if repaint_event not in sent_events:
-                    repainted = await asyncio.to_thread(
-                        repaint_full_schedule
-                    )
-
-                    sent_events.add(repaint_event)
-
-                    await bot.send_message(
-                        chat_id=ADMIN_TELEGRAM_ID,
-                        text=(
-                            "🎨 Перевірку фарбування завершено.\n"
-                            f"Оброблено рядків: {repainted}"
-                        ),
-                    )
-            # Прибираємо старі записи за попередні дні
-            today = now.strftime("%Y-%m-%d")
-
-            sent_events = {
-                event
-                for event in sent_events
-                if event[0] == today
-            }
+            # Прибираємо старі записи за попередні дні.
+            sent_events = {event for event in sent_events if event[0] == current_date}
 
         except Exception as error:
-            print(
-                f"❌ Помилка циклу нагадувань: "
-                f"{error}",
-                flush=True,
-            )
+            print(f"❌ Помилка циклу нагадувань: {error}", flush=True)
 
         await asyncio.sleep(20)
