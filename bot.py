@@ -84,15 +84,16 @@ SHIFTS = {
 }
 
 SHIFT_EMOJI = {
-    "1": "🌅",
-    "1.1": "🌅",
-    "2": "🌃",
-    "3": "🌅",
-    "4": "🌴",
-    "5": "🌴",
-    "6": "🌇",
-    "6.1": "🌇",
+    "1": "🟢",
+    "1.1": "🟡",
+    "2": "🔵",
+    "3": "🟣",
+    "4": "⚪",
+    "5": "⚪",
+    "6": "🟠",
+    "6.1": "🟤",
 }
+
 
 main_menu = ReplyKeyboardMarkup(
     keyboard=[
@@ -253,7 +254,7 @@ def get_week_keyboard(user_id: int) -> InlineKeyboardMarkup:
                         manual_text = str(shift_code).split(":", 1)[1]
                         text = f"📝 {DAY_SHORT[day_code]} {manual_text}"
                     else:
-                        text = f"✅ {DAY_SHORT[day_code]} {SHIFTS[shift_code]}"
+                        text = f"{SHIFT_EMOJI.get(shift_code, '📌')} {DAY_SHORT[day_code]} {SHIFTS[shift_code]}"
             else:
                 text = f"▫️ {DAY_SHORT[day_code]} - не вибрано"
                         
@@ -292,7 +293,7 @@ def get_edit_days_keyboard(user_id: int) -> InlineKeyboardMarkup:
             text = f"✏️ {DAY_SHORT[day_code]}"
 
             if shift_code:
-                text += f" {SHIFTS[shift_code]}"
+                text += f" {SHIFT_EMOJI.get(shift_code, '📌')} {SHIFTS[shift_code]}"
 
             row.append(
                 InlineKeyboardButton(
@@ -348,7 +349,7 @@ async def get_shifts_keyboard(
         else:
             remaining_text = f"місць: {int(remaining)}"
 
-        prefix = "🟢" if is_available else "🔴"
+        prefix = SHIFT_EMOJI.get(shift_code, "📌") if is_available else "🔴"
         text = f"{prefix} {shift_code} — {shift_text} · {remaining_text}"
 
         if is_available:
@@ -661,7 +662,7 @@ async def choose_day(callback: CallbackQuery):
         callback.message,
         f"📅 {DAYS[day_code]}\n\n"
         "Оберіть зміну:\n\n"
-        "🟢 — місця є\n"
+        "🟢🟡🔵🟣🟠🟤⚪ — вид зміни, місця є\n"
         "🔴 — місць немає",
         reply_markup=await get_shifts_keyboard(day_code),
     )
@@ -713,7 +714,7 @@ async def choose_shift(callback: CallbackQuery):
             callback.message,
             build_fill_text(
                 user_id,
-                f"✅ {DAYS[day_code]}: {SHIFTS[shift_code]}",
+                f"✅ {DAYS[day_code]}: {SHIFT_EMOJI.get(shift_code, '📌')} {SHIFTS[shift_code]}",
             ),
             reply_markup=get_week_keyboard(user_id),
         )
